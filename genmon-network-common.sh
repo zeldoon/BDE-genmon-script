@@ -195,7 +195,7 @@ genmon_iface_display_name() {
     case "$iface" in
       wlan*|wlp*)
         name="$(nmcli -t -f ACTIVE,SSID dev wifi 2>/dev/null \
-          | awk -F: '$1=="yes" && $2!="" && $2!="--"{print $2; exit}')"
+          | awk -F: '$1=="yes" && $2!="" && $2!="--" {print $2; exit}')"
         [[ -z "$name" ]] && name="$(iw dev "$iface" link 2>/dev/null \
           | awk '/SSID:/{print $2; exit}')"
         [[ -n "$name" ]] && { printf '%s' "$name"; return; }
