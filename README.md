@@ -141,7 +141,6 @@ The genmon script's BT broadcast strength control lets you keep this link usable
      ```bash
      ssh youruser@192.168.7.1
      ```
-   - For RustDesk or VNC: use the same IP as the host.
 
 #### Using the genmon script with this setup
 
@@ -160,3 +159,4 @@ Contributions and forks for different remote control use cases are welcome. If y
 This is the BDE (Big Dick Energy) evolution of the genmon network scripts that originated in the zeldoon/genmon_scripts repository and were heavily used and extended in the RAZOR RPi5 operator toolkit.
 
 Use it, modify it, make your BT remote setups awesome (and power-efficient).
+"

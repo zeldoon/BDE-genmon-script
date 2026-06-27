@@ -32,8 +32,8 @@ genmon_load_settings() {
   local line
   while IFS= read -r line || [[ -n "$line" ]]; do
     line="${line%%#*}"
-    line="${line#"${line%%[![:space:]] *}"}"
-    line="${line%"${line##*[![:space:]]}"}"
+    line="${line#"${line%%[![:space:]]*} "}"
+    line="${line%"${line##*[![:space:]]} "}"
     [[ -z "$line" ]] && continue
 
     if [[ "$line" =~ ^WAN_TTL=([0-9]+)$ ]]; then
@@ -42,13 +42,13 @@ genmon_load_settings() {
     fi
     if [[ "$line" == -* ]]; then
       line="${line#-}"
-      line="${line#"${line%%[![:space:]] *}"}"
+      line="${line#"${line%%[![:space:]]*} "}"
       [[ -n "$line" ]] && GENMON_SKIP_IFACES+=("$line")
       continue
     fi
     if [[ "$line" == +* ]]; then
       line="${line#+}"
-      line="${line#"${line%%[![:space:]] *}"}"
+      line="${line#"${line%%[![:space:]]*} "}"
       [[ -n "$line" ]] && GENMON_EXTRA_IFACES+=("$line")
       continue
     fi
@@ -195,7 +195,7 @@ genmon_iface_display_name() {
     case "$iface" in
       wlan*|wlp*)
         name="$(nmcli -t -f ACTIVE,SSID dev wifi 2>/dev/null \
-          | awk -F: '$1=="yes" && $2!="" && $2!="--" {print $2; exit}')"
+          | awk -F: '$1=="yes" && $2!="" && $2!="--"{print $2; exit}')"
         [[ -z "$name" ]] && name="$(iw dev "$iface" link 2>/dev/null \
           | awk '/SSID:/{print $2; exit}')"
         [[ -n "$name" ]] && { printf '%s' "$name"; return; }
@@ -348,4 +348,4 @@ genmon_power_label() {
     *status=marg*) echo "MARG" ;;
     *) echo "OK" ;;
   esac
-}
+} 
