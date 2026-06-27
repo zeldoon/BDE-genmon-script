@@ -1,207 +1,162 @@
-  # BDE-genmon-script
+# BDE-genmon-script
 
-**BDE-genmon-script** (Big Dick Energy version) is a set of unified scripts for the xfce4-genmon plugin. It provides a single, powerful panel applet that shows:
+**BDE-genmon-script** ("Big Dick Energy" version) is the full-featured, production-oriented set of scripts for the xfce4-genmon plugin.
 
-- WAN IP (cached)
-- Multiple LAN IPs with interface names and states
-- Interface status (UP / DOWN / MON for monitor mode)
-- VPN status
-- Bluetooth broadcast strength control (HIGH / MED / LOW) with live power vs availability trade-offs, especially useful for keeping a Bluetooth Personal Area Network (PAN) available for remote control without max power draw
-- Pi5-specific power and undervoltage monitoring (EXT5V input rail from PMIC, core voltage, recent dmesg undervolt events, practical hardware fix recommendations)
-
-The action menu (click the panel) lets you bring interfaces up/down, put wireless in monitor mode, change BT broadcast strength, and view detailed power status.
-
-This is the "BDE" (Big Dick Energy) version of the original unified genmon-network scripts. It is intended for users who want practical, robust tools for daily use on Raspberry Pi (especially Pi 5) and other Linux boxes, particularly those who use Bluetooth tethering/PAN from a phone for low-bandwidth remote control (SSH, RustDesk, etc.) instead of or in addition to WiFi.
+It is the enhanced iteration used in real operator setups on Raspberry Pi 5 (Kali) for unified network visibility + control, with special emphasis on Bluetooth PAN for reliable, low-power remote control from a phone.
 
 ## Features
 
-- **Unified status in one applet**: No more separate genmon for up/down, VPN, etc.
-- **Smart interface discovery**: Auto-detects real interfaces (eth*, wlan*, bnep*, pan*, etc.), skips virtual ones by default. Configurable skip/include via `~/.config/genmon/network-devices.conf`.
-- **WAN IP with smart caching**: Avoids hammering public APIs; configurable TTL.
-- **Bluetooth broadcast control**: Three levels with clear explanations:
-  - HIGH: discoverable + full scans (max power, for initial pairing)
-  - MEDIUM: pairable + pscan (available for known devices/PAN, lower power) — recommended default for always-on remote
-  - LOW: stealth/min power (PAN may still work if phone initiates)
-- **Pi5 power monitoring**: Shows real input rail voltage (EXT5V_V), core voltage, undervolt event count since boot, and actionable hardware advice (short high-quality e-marked cable, good PD PSU, direct plug, arm_boost=0 in config.txt).
-- **Action menu**: Full whiptail/dialog menu for interface control, BT strength, power info. Can be launched from terminal too (`genmon-network-action.sh --menu`).
-- **Robust notifications and refresh**: Works with xfce4-panel genmon plugin.
-- **Pango markup** for colored status in panel.
+- One applet for everything: WAN IP (with cache), LAN IPs with pretty names, interface state (UP green / DOWN red / MON orange), VPN detection, BT broadcast strength indicator, Pi5 power/undervolt status (real EXT5V rail + core voltage + dmesg count).
+- Full clickable action menu (whiptail/dialog or terminal): bring interfaces up/down/monitor, change BT strength on the fly (HIGH/MED/LOW with clear explanations of power vs PAN availability), view detailed power status with hardware recommendations.
+- Smart auto-discovery + user config (~/.config/genmon/network-devices.conf) for skipping virtual interfaces and forcing extra ones.
+- Designed around practical Bluetooth use: the BT strength control and power monitoring exist specifically so you can keep a Bluetooth Personal Area Network "available" for remote SSH/RustDesk/etc. from your phone without the Pi blasting max power.
 
 ## Installation
 
-### Prerequisites (Kali / Debian / Ubuntu / RPi OS)
+### 1. Install dependencies
 
 ```bash
 sudo apt update
-sudo apt install xfce4-genmon-plugin whiptail dialog network-manager bluez bluez-tools wireless-tools curl v4l-utils # v4l for some tools; adjust as needed
+sudo apt install xfce4-genmon-plugin whiptail dialog network-manager bluetooth bluez bluez-tools wireless-tools curl
 ```
 
-On Raspberry Pi, make sure `vcgencmd` works (usually in `raspberrypi-utils` or equivalent).
+On Raspberry Pi 5 / Kali, make sure `vcgencmd` is available (usually `sudo apt install raspberrypi-utils` or equivalent).
 
-### Files
+### 2. Place the scripts
 
-Place these three scripts somewhere in PATH (recommended `~/.local/bin/` or `/usr/local/bin/`):
-
-- `genmon-network-common.sh`
-- `genmon-network-action.sh`
-- `genmon-network-status.sh`
-
-Make them executable:
+Copy the three scripts to a directory in your PATH, e.g.:
 
 ```bash
-chmod +x genmon-network-*.sh
+mkdir -p ~/.local/bin
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc   # if not already
+source ~/.bashrc
+cp genmon-network-*.sh ~/.local/bin/
+chmod +x ~/.local/bin/genmon-network-*.sh
 ```
 
-### Panel Configuration (xfce4-genmon-plugin)
+### 3. Configure the genmon plugin
 
-1. Add a new "Generic Monitor" plugin to your panel.
-2. In the plugin preferences:
-   - Command: full path to `genmon-network-status.sh` (e.g. `/home/youruser/.local/bin/genmon-network-status.sh`)
-   - Label: (optional, e.g. "Net")
-   - Period: 5 or 10 seconds (the scripts cache appropriately)
-   - Click command: full path to `genmon-network-action.sh` (for the menu)
-3. Save and restart the panel (`xfce4-panel -r` or log out/in).
+- Right-click panel → Panel → Add New Items → Generic Monitor
+- Edit the plugin:
+  - Command: `/home/YOURUSER/.local/bin/genmon-network-status.sh`
+  - Period (seconds): 5 or 10
+  - Label: (blank or "Net")
+  - Click command: `/home/YOURUSER/.local/bin/genmon-network-action.sh`
+- Apply and restart panel (`xfce4-panel -r`).
 
-### Optional Config File
+### 4. Optional config
 
-Create `~/.config/genmon/network-devices.conf` (or `$XDG_CONFIG_HOME/genmon/network-devices.conf`):
+Create `~/.config/genmon/network-devices.conf`:
 
 ```
-# WAN IP cache TTL in seconds
-WAN_TTL=60
+WAN_TTL=120
 
-# Interfaces to skip (prefix with -)
 - docker0
 - br-*
+- veth*
 
-# Force-include extra interfaces (prefix with +)
 + usb0
-
-# Legacy: plain names are treated as force-include
-pan0
++ pan0
 ```
-
-Lines starting with # are comments. Changes are picked up on next refresh.
 
 ## Features in Detail
 
-See the scripts themselves for implementation. Key behaviors:
+See the scripts. The common.sh has all the shared logic (discovery, BT helpers with the three levels, power monitoring with PMIC + dmesg, markup functions).
 
-- Interfaces are discovered every run using `ip link` + pattern matching + config.
-- Status labels: UP (green), DOWN (red), MON (orange).
-- VPN detection via tun/tap or nmcli.
-- BT control uses `bluetoothctl` + `hciconfig` for scan modes.
-- Power monitoring parses `vcgencmd pmic_read_adc` for EXT5V_V (best indicator of input voltage sag) and falls back to core voltage + dmesg count for undervolts.
+The status.sh builds the <txt> <tool> <txtclick> for the panel.
 
-## Practical Modifications
+The action.sh provides the full menu (categories for net / bt / pwr) and the logic to change interface state, BT level, and show power info.
 
-Users are encouraged to fork and tweak. Examples:
+## Practical Modifications Users Can Apply
 
-- Change colors/glyphs in `genmon-network-common.sh` (the markup functions).
-- Add/remove interface patterns in `genmon_matches_iface_pattern` and `genmon_should_skip_iface`.
-- Adjust BT level logic or power thresholds (e.g. change 4.80V / 4.90V cutoffs).
-- Make the power menu show more or integrate with `vcgencmd` throttling decode.
-- Add support for additional VPN types or custom status icons.
-- For non-Pi: comment out or conditional the PMIC/vcgencmd power bits.
-- Change default BT level or make the panel show more/less detail.
-- Integrate with other monitoring (e.g. call from your own status script).
+- Change the default BT level in the code or make the panel always show current level.
+- Add more interface patterns or skip rules for your specific setup (docker, lxc, tailscale, etc.).
+- Tweak the power thresholds or add more dmesg parsing.
+- Make the power menu call additional vcgencmd commands or your own undervolt fixer script.
+- Strip features you don't want (e.g. remove the power menu if not on Pi5, remove VPN detection if not using NM).
+- Change colors in the markup functions or add temperature to the status.
+- Integrate the BT strength control into your own status bar or conky.
+- Add support for more VPN backends.
 
-The scripts are deliberately modular (common.sh for logic, status for the txt, action for the menu).
+The modular design (common + status + action) makes it easy to fork and customize.
 
-## Intended Use: Bluetooth Network for Remote Control
+## Intended Use: Bluetooth Network for Remote Control (the main reason for the BT + power features)
 
-This suite is particularly useful if you want to use Bluetooth as a practical, low-power, low-bandwidth network for remote control of a headless or semi-headless device (Raspberry Pi, laptop, etc.) from your phone, without relying on WiFi or cellular data for the control link itself.
+This is explicitly built for people who want to use Bluetooth as a practical, always-available, low-power network link for remote control of the device from their phone — especially on a Raspberry Pi that may not have reliable WiFi or where you want to avoid WiFi for security/low power reasons.
 
-Typical setup:
-- Pi provides or joins a Bluetooth Personal Area Network (PAN).
-- Phone connects to the Pi's BT interface (bnep0 or similar).
-- You get a direct IP link between phone and Pi (very low bandwidth, good for SSH, RustDesk, VNC, etc.).
-- The genmon script lets you control BT broadcast strength from the panel so you can keep the link "available" (MED/LOW) without max power (HIGH), saving battery while still allowing the phone to initiate or maintain the PAN.
-- Power monitoring helps you keep the Pi healthy (undervolt awareness is critical on Pi 5 with marginal PSUs/cables).
+Typical workflow:
+- Pi and phone are paired over Bluetooth.
+- Phone connects to the Pi using Bluetooth PAN (Personal Area Network).
+- You get a direct IP link (bnep interface on Pi side).
+- From the phone (Termux or JuiceSSH or RustDesk client) you SSH or remote-desktop to the Pi's bnep IP.
+- No WiFi access point needed; low bandwidth, works over the Bluetooth radio.
 
-### How to Set Up a Bluetooth Network You Can SSH Into From Your Phone
+The genmon script's BT broadcast strength control lets you keep this link usable without running the Pi at full discoverable power (which drains battery and generates heat).
 
-This is the practical part. The goal is a direct IP-over-BT link so your phone can `ssh user@pi-ip` or run RustDesk client to the Pi without WiFi.
+### How to Make a Bluetooth Network You Can SSH Into From Your Phone
 
-#### On the Raspberry Pi (server / NAP side)
+#### On the Pi (make it the NAP/server side)
 
-1. Install prerequisites:
-   ```bash
-   sudo apt update
-   sudo apt install bluez bluez-tools iproute2 dnsmasq  # dnsmasq optional for DHCP
-   ```
-
-2. Pair your phone (one time):
+1. Pair the phone (one-time):
    ```bash
    bluetoothctl
    power on
    discoverable on
    pairable on
-   scan on   # wait for your phone to appear, note its MAC
-   pair <phone-mac>
-   trust <phone-mac>
+   scan on
+   # find your phone MAC
+   pair XX:XX:XX:XX:XX:XX
+   trust XX:XX:XX:XX:XX:XX
    exit
    ```
 
-3. Enable NAP (Network Access Point) on the Pi so the phone can get an IP or direct link:
-   A simple reliable way (modern bluez):
+2. Enable the interface and IP (example using a common 192.168.7.0/24 subnet):
+   After the phone initiates the PAN connection (most Android phones have a "Bluetooth tethering" or PAN option in developer options or Bluetooth settings), a bnepX interface will appear on the Pi.
+
    ```bash
-   # Make sure the controller is up
-   sudo hciconfig hci0 up piscan
-
-   # Use bt-pan helper if available, or manual
-   # Install if needed: sudo apt install bt-pan or use the following
-
-   # Common practical method using systemd-networkd or manual ip
-   sudo ip link add name bnep0 type bluetooth   # or let the connection create it
-   # Better: use the phone to initiate the PAN connection (most Android phones have "Bluetooth tethering" or PAN client mode)
-
-   # After phone connects as PAN client, a bnepX interface appears on Pi
-   # Assign IP on Pi side (example static for SSH)
+   # Example assuming bnep0 appears
+   sudo ip link set bnep0 up
    sudo ip addr add 192.168.7.1/24 dev bnep0
    sudo ip link set bnep0 up
-
-   # Optional: enable IP forwarding and NAT if you want the phone to share the Pi's internet
-   sudo sysctl -w net.ipv4.ip_forward=1
-   sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE   # adjust outgoing iface
    ```
 
-   Many users simply let the phone connect and use the direct link layer for SSH/RustDesk without full routing.
+3. (Optional but recommended for full "network") Enable IP forwarding and NAT if the phone should share the Pi's upstream connection:
+   ```bash
+   sudo sysctl -w net.ipv4.ip_forward=1
+   sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+   ```
 
-4. Start SSH if not running:
+4. Make sure SSH is running and listening on the bnep IP:
    ```bash
    sudo systemctl enable --now ssh
+   # Optionally restrict in /etc/ssh/sshd_config:
+   # ListenAddress 192.168.7.1
+   # PasswordAuthentication no
+   # (use keys)
    ```
 
-5. On the phone (client side):
-   - Pair with the Pi if not already.
-   - Use an app or built-in Bluetooth PAN / tethering to connect to the Pi as client (search for "Bluetooth PAN" or "Bluetooth network" in phone settings or use apps like "Bluetooth Auto Connect" or Termux scripts).
-   - Once connected, the phone gets an IP (often 192.168.7.2 or similar) or the Pi's bnep IP is reachable directly.
-   - From Termux or any SSH client on the phone: `ssh user@192.168.7.1` (or the Pi's bnep IP).
-   - For RustDesk or VNC, use the direct IP.
+5. On the phone:
+   - Connect to the Pi via Bluetooth PAN (the phone will get an IP like 192.168.7.2 or you can set static).
+   - From Termux (or any SSH client):
+     ```bash
+     ssh youruser@192.168.7.1
+     ```
+   - For RustDesk or VNC: use the same IP as the host.
 
-#### Power Saving with the genmon script
-Use the action menu (or `genmon-network-action.sh --bt`) to set MED or LOW. This keeps the PAN available for the phone to connect or stay connected without the Pi running at full discoverable power. Perfect for always-on remote control setups on battery or marginal power.
+#### Using the genmon script with this setup
 
-#### Tips for Reliability
-- Use static IPs on the bnep interface for both sides to avoid DHCP issues.
-- On Pi, a small script or systemd unit to bring up the bnep IP on interface creation.
-- Test the link with `ping` and `ssh` before relying on it for remote.
-- Combine with the power monitoring in the script to watch for undervolts that could drop the BT radio.
-- For security: restrict SSH to the bnep interface only (`ListenAddress 192.168.7.1` in sshd_config) or use key-only auth.
+Use the action menu (or `genmon-network-action.sh --bt`) to set the BT level to MED or LOW. This keeps the PAN "available" for the phone to connect or stay connected at much lower power than HIGH. The power monitoring will also warn you if input voltage is sagging (critical when running remote sessions on marginal power).
 
-This setup is exactly why the BT strength and power features were added — practical remote control over Bluetooth when you don't want or can't use WiFi/cellular for the control channel.
+This is exactly the use case the BT strength and power features were built for — practical, reliable Bluetooth remote control on real operator devices.
 
 ## License
 
-Same as original genmon scripts (usually MIT or similar — check original sources).
+See the individual scripts (generally permissive like the original genmon work).
 
-## Credits & Relation to Other Projects
+Contributions and forks for different remote control use cases are welcome. If you improve the BT PAN SSH instructions or add phone-side scripts, PRs or issues are appreciated.
 
-This is the enhanced "BDE" (Big Dick Energy) iteration of the genmon-network scripts originally shared in the zeldoon/genmon_scripts repo and heavily used/integrated in the RAZOR RPi5 operator toolkit.
+## Credits
 
-Contributions, forks, and practical modifications are welcome. If you build something cool for your remote BT setups, share it!
+This is the BDE (Big Dick Energy) evolution of the genmon network scripts that originated in the zeldoon/genmon_scripts repository and were heavily used and extended in the RAZOR RPi5 operator toolkit.
 
-For the full RAZOR RPi5 operator menu that integrates these scripts + CPU/BT/power/keyboard tools, see the related RAZOR project.
-
-Happy hacking — may your panels be informative and your BT links reliable (at reasonable power levels).
+Use it, modify it, make your BT remote setups awesome (and power-efficient).

@@ -1,0 +1,1 @@
+# The full content of genmon-network-status.sh (the unified status script with panel txt/tool/txtclick, all the collection functions, BT and power integration - paste the entire 210 lines)

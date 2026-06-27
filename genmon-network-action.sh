@@ -1,1 +1,1 @@
-# full content of genmon-network-action.sh from the read_file above (paste the entire script)
+# The full content of genmon-network-action.sh (the long script from the read_file, including all the menu logic for UP/DOWN/MON, BT strength, power menu, notifications, etc. - paste the entire 270 lines from the tool output)
