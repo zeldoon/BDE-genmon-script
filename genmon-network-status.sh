@@ -108,6 +108,7 @@ collect_lan_entries() {
     [[ -n "$ip" ]] || continue
     [[ -n "${seen_ip[$ip]:-}" ]] && continue
     seen_ip["$ip"]=1
+    label="$(iface_display_name "$iface")"
     entries+=("LAN: ${ip} (${label})")
   done
   ((${#entries[@]})) || return 1
